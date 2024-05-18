@@ -1,0 +1,21 @@
+# Node modules
+node_modules/
+Client/node_modules/
+Contracts/node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Truffle and Ganache datoteke
+Contracts/build
+*.secret
+.env
+.history
+
+# MacOS files
+.DS_Store
+
+# Windows files
+Thumbs.db
