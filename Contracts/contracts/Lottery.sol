@@ -10,6 +10,9 @@ contract Lottery is Ownable {
     mapping(address => uint256) public playerStakes;
     uint256 public constant MINIMUM_BALANCE = 100 * 10 ** 18;
 
+    event PlayerEntered(address indexed player, uint256 stake);
+    event WinnerPicked(address indexed winner, uint256 prize);
+
     constructor(address _tokenAddress) Ownable(msg.sender) {
         token = IERC20(_tokenAddress);
     }
@@ -22,6 +25,8 @@ contract Lottery is Ownable {
             players.push(msg.sender);
         }
         playerStakes[msg.sender] += stake;
+
+        emit PlayerEntered(msg.sender, stake);
     }
 
     function pickWinner() public onlyOwner {
@@ -39,5 +44,7 @@ contract Lottery is Ownable {
         }
 
         delete players;
+
+        emit WinnerPicked(winner, prize);
     }
 }
