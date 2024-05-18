@@ -2,14 +2,15 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Lottery {
+contract Lottery is Ownable {
     IERC20 public token;
     address[] public players;
     mapping(address => uint256) public playerStakes;
     uint256 public constant MINIMUM_BALANCE = 100 * 10 ** 18;
 
-    constructor(address _tokenAddress) {
+    constructor(address _tokenAddress) Ownable(msg.sender) {
         token = IERC20(_tokenAddress);
     }
 
@@ -23,7 +24,7 @@ contract Lottery {
         playerStakes[msg.sender] += stake;
     }
 
-    function pickWinner() public {
+    function pickWinner() public onlyOwner {
         require(players.length == 5, "Not enough players");
 
         uint256 random = uint256(keccak256(abi.encodePacked(block.prevrandao, block.timestamp, players)));
