@@ -3,6 +3,9 @@ node_modules/
 Client/node_modules/
 Contracts/node_modules/
 
+# Contracts
+Contracts/.env
+
 # Logs
 logs
 *.log

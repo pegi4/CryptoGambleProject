@@ -9,12 +9,14 @@ contract Lottery is Ownable {
     address[] public players;
     mapping(address => uint256) public playerStakes;
     uint256 public constant MINIMUM_BALANCE = 100 * 10 ** 18;
+    address public founderWallet;
 
     event PlayerEntered(address indexed player, uint256 stake);
-    event WinnerPicked(address indexed winner, uint256 prize);
+    event WinnerPicked(address indexed winner, uint256 prize, uint256 founderShare, address founderWallet);
 
-    constructor(address _tokenAddress) Ownable(msg.sender) {
+    constructor(address _tokenAddress, address _founderWallet) Ownable(msg.sender) {
         token = IERC20(_tokenAddress);
+        founderWallet = _founderWallet;
     }
 
     function enterLottery(uint256 stake) public {
@@ -36,15 +38,27 @@ contract Lottery is Ownable {
         uint256 winnerIndex = random % players.length;
         address winner = players[winnerIndex];
 
-        uint256 prize = token.balanceOf(address(this));
-        token.transfer(winner, prize);
+        uint256 totalPrize = token.balanceOf(address(this));
+        uint256 winnerStake = playerStakes[winner];
+        uint256 profit = totalPrize - winnerStake;
+        uint256 founderShare = profit / 10;
+        uint256 winnerShare = totalPrize - founderShare;
 
-        for (uint256 i = 0; i < players.length; i++) {
+        // Transfer shares
+        token.transfer(founderWallet, founderShare);
+        token.transfer(winner, winnerShare);
+
+        // Reset players and stakes
+        for (uint8 i = 0; i < players.length; i++) {
             playerStakes[players[i]] = 0;
         }
-
         delete players;
 
-        emit WinnerPicked(winner, prize);
+        emit WinnerPicked(winner, winnerShare, founderShare, founderWallet);
+    }
+
+    // Optional: Function to update the founder wallet address
+    function updateFounderWallet(address _newFounderWallet) public onlyOwner {
+        founderWallet = _newFounderWallet;
     }
 }
