@@ -23,6 +23,9 @@ const Home = () => {
   const [tokenContract, setTokenContract] = useState<ethers.Contract | null>(null);
   const [lotteryContract, setLotteryContract] = useState<ethers.Contract | null>(null);
   const [stake, setStake] = useState<string>('');
+  const [lotteryAddress, setLotteryAddress] = useState<string>('');
+  const [lotteryBalance, setLotteryBalance] = useState<string>('');
+  const [participants, setParticipants] = useState<{ address: string; stake: string }[]>([]);
 
   useEffect(() => {
     loadBlockchainData();
@@ -52,6 +55,7 @@ const Home = () => {
 
         const lotteryContract = new ethers.Contract(deployedLotteryNetwork.address, Lottery.abi, provider.getSigner(accounts[0]));
         setLotteryContract(lotteryContract);
+        setLotteryAddress(deployedLotteryNetwork.address);
 
         const balances: { [key: string]: string } = {};
         for (const account of accounts) {
@@ -59,6 +63,16 @@ const Home = () => {
           balances[account] = ethers.utils.formatEther(balance);
         }
         setBalances(balances);
+
+        const lotteryBalance = await tokenContract.balanceOf(deployedLotteryNetwork.address);
+        setLotteryBalance(ethers.utils.formatEther(lotteryBalance));
+
+        const [participantsAddresses, participantsStakes] = await lotteryContract.getParticipants();
+        const participantsData = participantsAddresses.map((address: string, index: number) => ({
+          address,
+          stake: ethers.utils.formatEther(participantsStakes[index]),
+        }));
+        setParticipants(participantsData);
       } else {
         console.log('Smart contract not deployed to detected network.');
       }
@@ -76,14 +90,14 @@ const Home = () => {
       const recipientBalance = await tokenContract.balanceOf(recipient);
       setBalances((prevBalances) => ({
         ...prevBalances,
-        [recipient]: ethers.utils.formatEther(recipientBalance)
+        [recipient]: ethers.utils.formatEther(recipientBalance),
       }));
 
       // Osveži balans izbranega računa
       const selectedAccountBalance = await tokenContract.balanceOf(selectedAccount);
       setBalances((prevBalances) => ({
         ...prevBalances,
-        [selectedAccount]: ethers.utils.formatEther(selectedAccountBalance)
+        [selectedAccount]: ethers.utils.formatEther(selectedAccountBalance),
       }));
     }
   };
@@ -98,8 +112,19 @@ const Home = () => {
       const balance = await tokenContract.balanceOf(selectedAccount);
       setBalances((prevBalances) => ({
         ...prevBalances,
-        [selectedAccount]: ethers.utils.formatEther(balance)
+        [selectedAccount]: ethers.utils.formatEther(balance),
       }));
+
+      // Osveži balans loterije in seznam sodelujočih
+      const lotteryBalance = await tokenContract.balanceOf(lotteryContract.address);
+      setLotteryBalance(ethers.utils.formatEther(lotteryBalance));
+
+      const [participantsAddresses, participantsStakes] = await lotteryContract.getParticipants();
+      const participantsData = participantsAddresses.map((address: string, index: number) => ({
+        address,
+        stake: ethers.utils.formatEther(participantsStakes[index]),
+      }));
+      setParticipants(participantsData);
     }
   };
 
@@ -133,6 +158,17 @@ const Home = () => {
         />
         <button onClick={enterLottery}>Enter Lottery</button>
       </div>
+      <h2>Lottery Contract Info</h2>
+      <p>Lottery Address: {lotteryAddress}</p>
+      <p>Lottery Balance: {lotteryBalance} MTK</p>
+      <h3>Participants</h3>
+      <ul>
+        {participants.map(participant => (
+          <li key={participant.address}>
+            {participant.address}: {participant.stake} MTK
+          </li>
+        ))}
+      </ul>
       <h2>All Accounts</h2>
       <ul>
         {accounts.map(account => (

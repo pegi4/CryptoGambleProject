@@ -61,4 +61,12 @@ contract Lottery is Ownable {
     function updateFounderWallet(address _newFounderWallet) public onlyOwner {
         founderWallet = _newFounderWallet;
     }
+
+    function getParticipants() public view returns (address[] memory, uint256[] memory) {
+        uint256[] memory stakes = new uint256[](players.length);
+        for (uint256 i = 0; i < players.length; i++) {
+            stakes[i] = playerStakes[players[i]];
+        }
+        return (players, stakes);
+    }
 }
