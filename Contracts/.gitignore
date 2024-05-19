@@ -1,10 +1,5 @@
-# Node modules
 node_modules/
-Client/node_modules/
-Contracts/node_modules/
-
-# Contracts
-Contracts/.env
+.env
 
 # Logs
 logs
@@ -12,10 +7,11 @@ logs
 npm-debug.log*
 
 # Truffle and Ganache datoteke
-Contracts/build
+/build
 *.secret
 .env
 .history
+yarn.lock
 
 # MacOS files
 .DS_Store
