@@ -1,9 +1,11 @@
+// app/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ethers } from "ethers";
+import { ethers } from 'ethers';
 import MyToken from '../../contracts/build/contracts/GambleToken.json';
 import Lottery from '../../contracts/build/contracts/Lottery.json';
+
 
 declare global {
   interface Window {
@@ -15,10 +17,11 @@ interface Network {
   address: string;
 }
 
+
 const Home = () => {
-  const [account, setAccount] = useState<string>('');
-  const [tokenBalance, setTokenBalance] = useState<string>('');
-  const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
+  const [accounts, setAccounts] = useState<string[]>([]);
+  const [balances, setBalances] = useState<{ [key: string]: string }>({});
+  const [provider, setProvider] = useState<ethers.providers.JsonRpcProvider | null>(null);
   const [tokenContract, setTokenContract] = useState<ethers.Contract | null>(null);
   const [lotteryContract, setLotteryContract] = useState<ethers.Contract | null>(null);
 
@@ -27,33 +30,40 @@ const Home = () => {
   }, []);
 
   const loadBlockchainData = async () => {
-    if (window.ethereum) {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      await provider.send('eth_requestAccounts', []);
+    try {
+      const provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545');
       setProvider(provider);
 
-      const signer = provider.getSigner();
-      const account = await signer.getAddress();
-      setAccount(account);
+      const accounts = await provider.listAccounts();
+      setAccounts(accounts);
 
       const networkId = (await provider.getNetwork()).chainId;
+      console.log('Detected network ID:', networkId);
+
       const deployedTokenNetwork = (MyToken.networks as { [key: number]: Network })[networkId];
       const deployedLotteryNetwork = (Lottery.networks as { [key: number]: Network })[networkId];
 
       if (deployedTokenNetwork && deployedLotteryNetwork) {
-        const tokenContract = new ethers.Contract(deployedTokenNetwork.address, MyToken.abi, signer);
+        console.log('Token address:', deployedTokenNetwork.address);
+        console.log('Lottery address:', deployedLotteryNetwork.address);
+
+        const tokenContract = new ethers.Contract(deployedTokenNetwork.address, MyToken.abi, provider.getSigner(accounts[0]));
         setTokenContract(tokenContract);
 
-        const lotteryContract = new ethers.Contract(deployedLotteryNetwork.address, Lottery.abi, signer);
+        const lotteryContract = new ethers.Contract(deployedLotteryNetwork.address, Lottery.abi, provider.getSigner(accounts[0]));
         setLotteryContract(lotteryContract);
 
-        const balance = await tokenContract.balanceOf(account);
-        setTokenBalance(ethers.utils.formatEther(balance));
+        const balances: { [key: string]: string } = {};
+        for (const account of accounts) {
+          const balance = await tokenContract.balanceOf(account);
+          balances[account] = ethers.utils.formatEther(balance);
+        }
+        setBalances(balances);
       } else {
         console.log('Smart contract not deployed to detected network.');
       }
-    } else {
-      console.log('MetaMask not detected');
+    } catch (error) {
+      console.error('Error loading blockchain data:', error);
     }
   };
 
@@ -61,8 +71,13 @@ const Home = () => {
     if (tokenContract) {
       const tx = await tokenContract.transfer(recipient, ethers.utils.parseEther(amount));
       await tx.wait();
-      const balance = await tokenContract.balanceOf(account);
-      setTokenBalance(ethers.utils.formatEther(balance));
+      const balance = await tokenContract.balanceOf(recipient);
+      setBalances({ ...balances, [recipient]: ethers.utils.formatEther(balance) });
+      const mainAccountBalance = await tokenContract.balanceOf(accounts[0]);
+      setBalances((prevBalances) => ({
+        ...prevBalances,
+        [accounts[0]]: ethers.utils.formatEther(mainAccountBalance)
+      }));
     }
   };
 
@@ -72,16 +87,16 @@ const Home = () => {
       await tx.wait();
       const enterTx = await lotteryContract.enterLottery();
       await enterTx.wait();
-      const balance = await tokenContract.balanceOf(account);
-      setTokenBalance(ethers.utils.formatEther(balance));
+      const balance = await tokenContract.balanceOf(accounts[0]);
+      setBalances({ ...balances, [accounts[0]]: ethers.utils.formatEther(balance) });
     }
   };
 
   return (
     <div>
       <h1>MyToken Balance</h1>
-      <p>Your account: {account}</p>
-      <p>Your balance: {tokenBalance} MTK</p>
+      <p>Your account: {accounts[0]}</p>
+      <p>Your balance: {balances[accounts[0]]} MTK</p>
       <form onSubmit={(e) => {
         e.preventDefault();
         const recipient = (e.target as any).recipient.value;
@@ -93,6 +108,14 @@ const Home = () => {
         <button type="submit">Transfer</button>
       </form>
       <button onClick={enterLottery}>Enter Lottery</button>
+      <h2>All Accounts</h2>
+      <ul>
+        {accounts.slice(1).map(account => (
+          <li key={account}>
+            {account}: {balances[account] || 'Loading...'} MTK
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

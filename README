@@ -1,0 +1,12 @@
+# Set up instructions
+
+1. go to ./contracts and run:
+
+    * yarn install
+    * ganache-cli -i 1337
+    * truffle migrate --network development --reset
+    - for testing Smart Contracts run: truffle test
+
+2. go to ./client and run:
+    * yarn install
+    * yarn dev
