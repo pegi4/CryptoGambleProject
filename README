@@ -3,7 +3,8 @@
 1. go to ./contracts and run:
 
     * yarn install
-    * ganache-cli -i 1337
+    * ganache -i 1337
+    * create .env file and add address (FOUNDER_WALLET)
     * truffle migrate --network development --reset
     - for testing Smart Contracts run: truffle test
 

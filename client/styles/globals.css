@@ -40,3 +40,7 @@ button {
   background-color: blue;
   border-radius: 10%;
 }
+
+select {
+  background-color: brown;
+}

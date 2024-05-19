@@ -1,11 +1,9 @@
-// app/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 import MyToken from '../../contracts/build/contracts/GambleToken.json';
 import Lottery from '../../contracts/build/contracts/Lottery.json';
-
 
 declare global {
   interface Window {
@@ -17,13 +15,14 @@ interface Network {
   address: string;
 }
 
-
 const Home = () => {
   const [accounts, setAccounts] = useState<string[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<string>('');
   const [balances, setBalances] = useState<{ [key: string]: string }>({});
   const [provider, setProvider] = useState<ethers.providers.JsonRpcProvider | null>(null);
   const [tokenContract, setTokenContract] = useState<ethers.Contract | null>(null);
   const [lotteryContract, setLotteryContract] = useState<ethers.Contract | null>(null);
+  const [stake, setStake] = useState<string>('');
 
   useEffect(() => {
     loadBlockchainData();
@@ -36,6 +35,7 @@ const Home = () => {
 
       const accounts = await provider.listAccounts();
       setAccounts(accounts);
+      setSelectedAccount(accounts[0]);
 
       const networkId = (await provider.getNetwork()).chainId;
       console.log('Detected network ID:', networkId);
@@ -69,34 +69,50 @@ const Home = () => {
 
   const transferTokens = async (recipient: string, amount: string) => {
     if (tokenContract) {
-      const tx = await tokenContract.transfer(recipient, ethers.utils.parseEther(amount));
+      const tx = await tokenContract.connect(provider!.getSigner(selectedAccount)).transfer(recipient, ethers.utils.parseEther(amount));
       await tx.wait();
-      const balance = await tokenContract.balanceOf(recipient);
-      setBalances({ ...balances, [recipient]: ethers.utils.formatEther(balance) });
-      const mainAccountBalance = await tokenContract.balanceOf(accounts[0]);
+
+      // Osveži balans prejemnika
+      const recipientBalance = await tokenContract.balanceOf(recipient);
       setBalances((prevBalances) => ({
         ...prevBalances,
-        [accounts[0]]: ethers.utils.formatEther(mainAccountBalance)
+        [recipient]: ethers.utils.formatEther(recipientBalance)
+      }));
+
+      // Osveži balans izbranega računa
+      const selectedAccountBalance = await tokenContract.balanceOf(selectedAccount);
+      setBalances((prevBalances) => ({
+        ...prevBalances,
+        [selectedAccount]: ethers.utils.formatEther(selectedAccountBalance)
       }));
     }
   };
 
   const enterLottery = async () => {
     if (lotteryContract && tokenContract) {
-      const tx = await tokenContract.approve(lotteryContract.address, ethers.utils.parseEther('100'));
+      const stakeAmount = ethers.utils.parseEther(stake);
+      const tx = await tokenContract.connect(provider!.getSigner(selectedAccount)).approve(lotteryContract.address, stakeAmount);
       await tx.wait();
-      const enterTx = await lotteryContract.enterLottery();
+      const enterTx = await lotteryContract.connect(provider!.getSigner(selectedAccount)).enterLottery(stakeAmount);
       await enterTx.wait();
-      const balance = await tokenContract.balanceOf(accounts[0]);
-      setBalances({ ...balances, [accounts[0]]: ethers.utils.formatEther(balance) });
+      const balance = await tokenContract.balanceOf(selectedAccount);
+      setBalances((prevBalances) => ({
+        ...prevBalances,
+        [selectedAccount]: ethers.utils.formatEther(balance)
+      }));
     }
   };
 
   return (
     <div>
       <h1>MyToken Balance</h1>
-      <p>Your account: {accounts[0]}</p>
-      <p>Your balance: {balances[accounts[0]]} MTK</p>
+      <select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)}>
+        {accounts.map(account => (
+          <option key={account} value={account}>{account}</option>
+        ))}
+      </select>
+      <p>Your account: {selectedAccount}</p>
+      <p>Your balance: {balances[selectedAccount]} MTK</p>
       <form onSubmit={(e) => {
         e.preventDefault();
         const recipient = (e.target as any).recipient.value;
@@ -107,10 +123,19 @@ const Home = () => {
         <input type="number" name="amount" placeholder="Amount" required />
         <button type="submit">Transfer</button>
       </form>
-      <button onClick={enterLottery}>Enter Lottery</button>
+      <div>
+        <input
+          type="number"
+          value={stake}
+          onChange={(e) => setStake(e.target.value)}
+          placeholder="Stake amount"
+          required
+        />
+        <button onClick={enterLottery}>Enter Lottery</button>
+      </div>
       <h2>All Accounts</h2>
       <ul>
-        {accounts.slice(1).map(account => (
+        {accounts.map(account => (
           <li key={account}>
             {account}: {balances[account] || 'Loading...'} MTK
           </li>
