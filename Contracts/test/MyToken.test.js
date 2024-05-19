@@ -40,9 +40,9 @@ contract("GambleToken", (accounts) => {
     const balance4 = await token.balanceOf(user4);
     expect(balance4.toString()).to.equal(web3.utils.toWei('100', 'ether'));
 
-    await token.transfer(user5, web3.utils.toWei('100', 'ether'), { from: deployer });
+    await token.transfer(user5, web3.utils.toWei('200', 'ether'), { from: deployer });
     const balance5 = await token.balanceOf(user5);
-    expect(balance5.toString()).to.equal(web3.utils.toWei('100', 'ether'));
+    expect(balance5.toString()).to.equal(web3.utils.toWei('200', 'ether'));
   });
 
   it("should allow entry into lottery", async () => {
@@ -66,10 +66,15 @@ contract("GambleToken", (accounts) => {
     const balance4 = await token.balanceOf(user4);
     expect(balance4.toString()).to.equal(web3.utils.toWei('0', 'ether'));
 
+    // Double entrence
     await token.approve(lottery.address, web3.utils.toWei('100', 'ether'), { from: user5 });
     await lottery.enterLottery(web3.utils.toWei('100', 'ether'), { from: user5 });
     const balance5 = await token.balanceOf(user5);
-    expect(balance5.toString()).to.equal(web3.utils.toWei('0', 'ether'));
+    expect(balance5.toString()).to.equal(web3.utils.toWei('100', 'ether'));
+    await token.approve(lottery.address, web3.utils.toWei('100', 'ether'), { from: user5 });
+    await lottery.enterLottery(web3.utils.toWei('100', 'ether'), { from: user5 });
+    const balance5_1 = await token.balanceOf(user5);
+    expect(balance5_1.toString()).to.equal(web3.utils.toWei('0', 'ether'));
   });
 
   it("should pick a winner correctly when five players are entered", async () => {
@@ -91,7 +96,7 @@ contract("GambleToken", (accounts) => {
     }));
 
     const winner = finalBalances.find((final, index) => final.balance !== initialBalances[index].balance);
-    const prize = web3.utils.toWei('500', 'ether'); // 5 players with 100 tokens each
+    const prize = web3.utils.toWei('600', 'ether');
     expect(winner).to.exist;
     expect(winner.balance).to.equal(prize);
   });
