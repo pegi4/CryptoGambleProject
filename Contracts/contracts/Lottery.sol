@@ -29,9 +29,13 @@ contract Lottery is Ownable {
         playerStakes[msg.sender] += stake;
 
         emit PlayerEntered(msg.sender, stake);
+
+        if (players.length == 5) {
+            pickWinner();
+        }
     }
 
-    function pickWinner() public onlyOwner {
+    function pickWinner() private {
         require(players.length == 5, "Not enough players");
 
         uint256 random = uint256(keccak256(abi.encodePacked(block.prevrandao, block.timestamp, players)));

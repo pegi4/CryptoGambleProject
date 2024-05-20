@@ -26,11 +26,25 @@ const Home = () => {
   const [lotteryAddress, setLotteryAddress] = useState<string>('');
   const [lotteryBalance, setLotteryBalance] = useState<string>('');
   const [participants, setParticipants] = useState<{ address: string; stake: string }[]>([]);
-  const [error, setError] = useState<string | null>(null); // Dodaj stanje za napake
+  const [winner, setWinner] = useState<{ address: string; amount: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadBlockchainData();
   }, []);
+
+  useEffect(() => {
+    if (lotteryContract) {
+      const winnerPickedListener = lotteryContract.on('WinnerPicked', (winnerAddress: string, winnerShare: ethers.BigNumber) => {
+        setWinner({ address: winnerAddress, amount: ethers.utils.formatEther(winnerShare) });
+        
+        loadLotteryData();
+      });
+      return () => {
+        lotteryContract.off('WinnerPicked', winnerPickedListener);
+      };
+    }
+  }, [lotteryContract]);
 
   const loadBlockchainData = async () => {
     try {
@@ -65,15 +79,7 @@ const Home = () => {
         }
         setBalances(balances);
 
-        const lotteryBalance = await tokenContract.balanceOf(deployedLotteryNetwork.address);
-        setLotteryBalance(ethers.utils.formatEther(lotteryBalance));
-
-        const [participantsAddresses, participantsStakes] = await lotteryContract.getParticipants();
-        const participantsData = participantsAddresses.map((address: string, index: number) => ({
-          address,
-          stake: ethers.utils.formatEther(participantsStakes[index]),
-        }));
-        setParticipants(participantsData);
+        loadLotteryData();
       } else {
         console.log('Smart contract not deployed to detected network.');
       }
@@ -82,9 +88,22 @@ const Home = () => {
     }
   };
 
+  const loadLotteryData = async () => {
+    if (tokenContract && lotteryContract) {
+      const lotteryBalance = await tokenContract.balanceOf(lotteryContract.address);
+      setLotteryBalance(ethers.utils.formatEther(lotteryBalance));
+
+      const [participantsAddresses, participantsStakes] = await lotteryContract.getParticipants();
+      const participantsData = participantsAddresses.map((address: string, index: number) => ({
+        address,
+        stake: ethers.utils.formatEther(participantsStakes[index]),
+      }));
+      setParticipants(participantsData);
+    }
+  };
+
   const transferTokens = async (recipient: string, amount: string) => {
     if (tokenContract) {
-      // Preverjanje za minimalno količino prenosa
       if (parseFloat(amount) < 1) {
         setError('Transfer amount must be at least 1 MTK');
         return;
@@ -94,21 +113,19 @@ const Home = () => {
         const tx = await tokenContract.connect(provider!.getSigner(selectedAccount)).transfer(recipient, ethers.utils.parseEther(amount));
         await tx.wait();
 
-        // Osveži balans prejemnika
         const recipientBalance = await tokenContract.balanceOf(recipient);
         setBalances((prevBalances) => ({
           ...prevBalances,
           [recipient]: ethers.utils.formatEther(recipientBalance),
         }));
 
-        // Osveži balans izbranega računa
         const selectedAccountBalance = await tokenContract.balanceOf(selectedAccount);
         setBalances((prevBalances) => ({
           ...prevBalances,
           [selectedAccount]: ethers.utils.formatEther(selectedAccountBalance),
         }));
 
-        setError(null); // Po uspešni transakciji počisti napako
+        setError(null);
       } catch (error) {
         setError('Transaction failed');
         console.error(error);
@@ -118,7 +135,6 @@ const Home = () => {
 
   const enterLottery = async () => {
     if (lotteryContract && tokenContract) {
-      // Preverjanje za minimalno količino za vstop v loterijo
       if (parseFloat(stake) < 1) {
         setError('Stake amount must be at least 1 MTK');
         return;
@@ -136,18 +152,8 @@ const Home = () => {
           [selectedAccount]: ethers.utils.formatEther(balance),
         }));
 
-        // Osveži balans loterije in seznam sodelujočih
-        const lotteryBalance = await tokenContract.balanceOf(lotteryContract.address);
-        setLotteryBalance(ethers.utils.formatEther(lotteryBalance));
-
-        const [participantsAddresses, participantsStakes] = await lotteryContract.getParticipants();
-        const participantsData = participantsAddresses.map((address: string, index: number) => ({
-          address,
-          stake: ethers.utils.formatEther(participantsStakes[index]),
-        }));
-        setParticipants(participantsData);
-
-        setError(null); // Po uspešni transakciji počisti napako
+        loadLotteryData();
+        setError(null);
       } catch (error) {
         setError('Transaction failed');
         console.error(error);
@@ -165,7 +171,7 @@ const Home = () => {
       </select>
       <p>Your account: {selectedAccount}</p>
       <p>Your balance: {balances[selectedAccount]} MTK</p>
-      {error && <p style={{ color: 'red' }}>{error}</p>} {/* Prikaz napake */}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
       <form onSubmit={(e) => {
         e.preventDefault();
         const recipient = (e.target as any).recipient.value;
@@ -190,6 +196,7 @@ const Home = () => {
       <p>Lottery Address: {lotteryAddress}</p>
       <p>Lottery Balance: {lotteryBalance} MTK</p>
       <h3>Participants</h3>
+      {winner && <h3>Winner: {winner.address} won {winner.amount} MTK</h3>} {/* Prikaz zmagovalca in njegove nagrade */}
       <ul>
         {participants.map(participant => (
           <li key={participant.address}>
